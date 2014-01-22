@@ -61,7 +61,7 @@ andThen : Automaton i inner -> Automaton inner o -> Automaton i o
 andThen f g =
   Step (\a -> let (f', b) = step a f
                   (g', c) = step b g
-              in  (f' >>> g', c))
+              in  (andThen f' g', c))
 
 loop : state -> Automaton (i,state) (o,state) -> Automaton i o
 loop state auto =
