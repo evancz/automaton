@@ -28,9 +28,9 @@ a larger program with it or have ideas of how to extend the API.
 @docs count, average
 -}
 
-import open Basics
+import Basics (..)
 import Signal (lift,foldp,Signal)
-import open List
+import List (..)
 import Maybe (Just, Nothing)
 
 data Automaton a b = Step (a -> (Automaton a b, b))
