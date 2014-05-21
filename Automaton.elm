@@ -63,6 +63,9 @@ andThen f g =
                   (g', c) = step b g
               in  (andThen f' g', c))
 
+{-| Feed an automaton's output into it's own input. Maintains a state within the
+loop, and updates that state after each run of the loop. 
+-}
 loop : state -> Automaton (i,state) (o,state) -> Automaton i o
 loop state auto =
     Step <| \input -> let (auto', (output,state')) = step (input,state) auto
@@ -102,8 +105,8 @@ state s f = Step (\x -> let s' = f x s
 {-| Create an automaton with hidden state. Requires an initial state and a
 step function to step the state forward and produce an output.
 -}
-hiddenState : s -> (i -> s -> (s,o)) -> Automaton i o
-hiddenState s f = Step (\x -> let (s',out) = f x s
+hiddenState : s -> (i -> s -> (o,s)) -> Automaton i o
+hiddenState s f = Step (\x -> let (out, s') = f x s
                               in  (hiddenState s' f, out))
 
 {-| Count the number of steps taken. -}
