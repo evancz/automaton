@@ -1,7 +1,7 @@
 module Automaton ( pure, state, hiddenState, run, step
                  , andThen, combine, loop, count, average
                  , branch, stack, extendDown, extendUp
-                 , before
+                 , before, reduceWith
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -65,7 +65,7 @@ andThen f g =
                     (g', c) = step b g
                  in (andThen f' g', c)
 
-{-| Perform a signal before another signal. Just like `andThen` but backwards.
+{-| Chains two automata together, backwards. 
 -}
 before : Automaton inner o -> Automaton i inner -> Automaton i o
 before g f =
@@ -73,7 +73,8 @@ before g f =
                     (g', c) = step b g
                  in (before g' f', c)
 
-{-| Combine two automatons that work on the same kind of input.
+{-| Combine two automatons that work on the same kind of input. the output
+becomes a tuple of the outputs. 
 -}
 branch : Automaton i o1 -> Automaton i o2 -> Automaton i (o1, o2)
 branch f g =
@@ -104,6 +105,15 @@ extendUp : Automaton i o -> Automaton (extra, i) (extra, o)
 extendUp auto = 
   Step <| \(ex, i) -> let (f, o) = step i auto
                        in (extendUp f, (ex, o))
+
+{-| Automaton reduction. Takes an automaton that outputs a tuple, and performs
+a user defined evaluation function. 
+-}
+reduceWith : Automaton i (o1, o2) -> (o1 -> o2 -> o) -> Automaton i o
+reduceWith auto f =
+  Step <| \a -> let (auto', (o1, o2)) = step a auto
+                    o = f o1 o2
+                 in (reduceWith auto' f, o)
 
 {-| Feed an automaton's output into it's own input. Maintains a state within the
 loop, and updates that state after each run of the loop. Requires an initial
