@@ -1,7 +1,7 @@
 module Automaton ( pure, state, hiddenState, run, step
-                 , andThen, combine, loop, count, average
+                 , (>>>), combine, loop, count, average
                  , branch, pair, first, second
-                 , before, merge
+                 , (<<<), merge
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -24,7 +24,7 @@ a larger program with it or have ideas of how to extend the API.
 @docs run, step, merge
 
 # Combine
-@docs andThen, before, second, first, branch, pair, combine, loop
+@docs (>>>), (<<<), second, first, branch, pair, combine, loop
 
 # Common Automatons
 @docs count, average
@@ -56,22 +56,22 @@ look something like this:
 move   : Automaton Spaceship Spaceship
 rotate : Automaton Spaceship Spaceship
 
-step = move `andThen` rotate
+step = move >>> rotate
 ```
 -}
-andThen : Automaton i inner -> Automaton inner o -> Automaton i o
-andThen f g =
+(>>>) : Automaton i inner -> Automaton inner o -> Automaton i o
+(>>>) f g =
   Step <| \a -> let (f', b) = step a f
                     (g', c) = step b g
-                 in (andThen f' g', c)
+                 in ((>>>) f' g', c)
 
 {-| Chains two automata together, backwards. 
 -}
-before : Automaton inner o -> Automaton i inner -> Automaton i o
-before g f =
+(<<<) : Automaton inner o -> Automaton i inner -> Automaton i o
+(<<<) g f =
   Step <| \a -> let (f', b) = step a f
                     (g', c) = step b g
-                 in (before g' f', c)
+                 in ((<<<) g' f', c)
 
 {-| Combine two automatons that work on the same kind of input. the output
 becomes a tuple of the outputs. 
