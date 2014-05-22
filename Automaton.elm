@@ -1,6 +1,7 @@
 module Automaton ( pure, state, hiddenState, run, step
                  , andThen, combine, loop, count, average
-                 , branch, extendDown
+                 , branch, stack, extendDown, extendUp
+                 , before
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -60,10 +61,17 @@ step = move `andThen` rotate
 -}
 andThen : Automaton i inner -> Automaton inner o -> Automaton i o
 andThen f g =
-  Step (\a -> let (f', b) = step a f
-                  (g', c) = step b g
-              in  (andThen f' g', c))
+  Step <| \a -> let (f', b) = step a f
+                    (g', c) = step b g
+                 in (andThen f' g', c)
 
+{-| Perform a signal before another signal. Just like `andThen` but backwards.
+-}
+before : Automaton inner o -> Automaton i inner -> Automaton i o
+before g f =
+  Step <| \a -> let (f', b) = step a f
+                    (g', c) = step b g
+                 in (before g' f', c)
 
 {-| Combine two automatons that work on the same kind of input.
 -}
@@ -72,6 +80,14 @@ branch f g =
   Step <| \a -> let (f', b) = step a f
                     (g', c) = step a g
                  in (branch f' g', (b, c))
+
+{-| Stacks two Automata on top of eachother, tupling inputs and outputs
+-}
+stack : Automaton i1 o1 -> Automaton i2 o2 -> Automaton (i1, i2) (o1, o2)
+stack f g = 
+  Step <| \(a, b) -> let (f', c) = step a f
+                         (g', d) = step b g
+                      in (stack f' g', (c, d))
 
 {-| Add an extra input "channel" to be ignored and just sent on as output.
 Useful as a building block for more complex automata.
@@ -87,7 +103,7 @@ to extendDown, but adds the input before the regular one.
 extendUp : Automaton i o -> Automaton (extra, i) (extra, o)
 extendUp auto = 
   Step <| \(ex, i) -> let (f, o) = step i auto
-                       in (extendUp f, (o, ex))
+                       in (extendUp f, (ex, o))
 
 {-| Feed an automaton's output into it's own input. Maintains a state within the
 loop, and updates that state after each run of the loop. Requires an initial
