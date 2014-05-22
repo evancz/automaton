@@ -1,7 +1,7 @@
 module Automaton ( pure, state, hiddenState, run, step
                  , andThen, combine, loop, count, average
-                 , branch, stack, extendDown, extendUp
-                 , before, reduceWith
+                 , branch, pair, first, second
+                 , before, merge
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -21,10 +21,10 @@ a larger program with it or have ideas of how to extend the API.
 @docs pure, state, hiddenState
 
 # Evaluate
-@docs run, step, reduceWith
+@docs run, step, merge
 
 # Combine
-@docs andThen, before, extendUp, extendDown, branch, stack, combine, loop
+@docs andThen, before, second, first, branch, pair, combine, loop
 
 # Common Automatons
 @docs count, average
@@ -84,36 +84,36 @@ branch f g =
 
 {-| Stacks two Automata on top of eachother, tupling inputs and outputs
 -}
-stack : Automaton i1 o1 -> Automaton i2 o2 -> Automaton (i1, i2) (o1, o2)
-stack f g = 
+pair : Automaton i1 o1 -> Automaton i2 o2 -> Automaton (i1, i2) (o1, o2)
+pair f g = 
   Step <| \(a, b) -> let (f', c) = step a f
                          (g', d) = step b g
-                      in (stack f' g', (c, d))
+                      in (pair f' g', (c, d))
 
 {-| Add an extra input "channel" to be ignored and just sent on as output.
 Useful as a building block for more complex automata.
 -}
-extendDown : Automaton i o -> Automaton (i, extra) (o, extra)
-extendDown auto = 
+first : Automaton i o -> Automaton (i, extra) (o, extra)
+first auto = 
   Step <| \(i, ex) -> let (f, o) = step i auto
-                       in (extendDown f, (o, ex))
+                       in (first f, (o, ex))
 
 {-| Adds an extra input "channel" to be ignored and sent on as output. Similar
-to extendDown, but adds the input before the regular one. 
+to first, but adds the input before the regular one. 
 -}
-extendUp : Automaton i o -> Automaton (extra, i) (extra, o)
-extendUp auto = 
+second : Automaton i o -> Automaton (extra, i) (extra, o)
+second auto = 
   Step <| \(ex, i) -> let (f, o) = step i auto
-                       in (extendUp f, (ex, o))
+                       in (second f, (ex, o))
 
 {-| Automaton reduction. Takes an automaton that outputs a tuple, and performs
 a user defined evaluation function. 
 -}
-reduceWith : Automaton i (o1, o2) -> (o1 -> o2 -> o) -> Automaton i o
-reduceWith auto f =
+merge : Automaton i (o1, o2) -> (o1 -> o2 -> o) -> Automaton i o
+merge auto f =
   Step <| \a -> let (auto', (o1, o2)) = step a auto
                     o = f o1 o2
-                 in (reduceWith auto' f, o)
+                 in (merge auto' f, o)
 
 {-| Feed an automaton's output into it's own input. Maintains a state within the
 loop, and updates that state after each run of the loop. Requires an initial
