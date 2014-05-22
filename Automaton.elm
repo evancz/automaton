@@ -1,6 +1,6 @@
 module Automaton ( pure, state, hiddenState, run, step
-                 , andThen, combine, loop, count--, average
-                 , branch
+                 , andThen, combine, loop, count, average
+                 , branch, extendDown
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -73,13 +73,21 @@ branch f g =
                     (g', c) = step a g
                  in (branch f' g', (b, c))
 
-{-| Add and extra input "channel" to be ignored and just sent on as output.
-Useful as a building block for more complex automata
+{-| Add an extra input "channel" to be ignored and just sent on as output.
+Useful as a building block for more complex automata.
 -}
 extendDown : Automaton i o -> Automaton (i, extra) (o, extra)
 extendDown auto = 
-  Step <| \(i, ex) -> let (f', o) = step i auto
-                       in (extendDown f', (o, ex))
+  Step <| \(i, ex) -> let (f, o) = step i auto
+                       in (extendDown f, (o, ex))
+
+{-| Adds an extra input "channel" to be ignored and sent on as output. Similar
+to extendDown, but adds the input before the regular one. 
+-}
+extendUp : Automaton i o -> Automaton (extra, i) (extra, o)
+extendUp auto = 
+  Step <| \(ex, i) -> let (f, o) = step i auto
+                       in (extendUp f, (o, ex))
 
 {-| Feed an automaton's output into it's own input. Maintains a state within the
 loop, and updates that state after each run of the loop. Requires an initial
