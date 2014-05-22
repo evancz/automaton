@@ -21,10 +21,10 @@ a larger program with it or have ideas of how to extend the API.
 @docs pure, state, hiddenState
 
 # Evaluate
-@docs run, step
+@docs run, step, reduceWith
 
 # Combine
-@docs andThen, combine, loop,  branch
+@docs andThen, before, extendUp, extendDown, branch, stack, combine, loop
 
 # Common Automatons
 @docs count, average
