@@ -1,5 +1,6 @@
 module Automaton ( pure, state, hiddenState, run, step
-                 , andThen, combine, loop, count, average
+                 , andThen, combine, loop, count--, average
+                 , branch
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -22,7 +23,7 @@ a larger program with it or have ideas of how to extend the API.
 @docs run, step
 
 # Combine
-@docs andThen, combine, loop
+@docs andThen, combine, loop,  branch
 
 # Common Automatons
 @docs count, average
@@ -63,8 +64,26 @@ andThen f g =
                   (g', c) = step b g
               in  (andThen f' g', c))
 
+
+{-| Combine two automatons that work on the same kind of input.
+-}
+branch : Automaton i o1 -> Automaton i o2 -> Automaton i (o1, o2)
+branch f g =
+  Step <| \a -> let (f', b) = step a f
+                    (g', c) = step a g
+                 in (branch f' g', (b, c))
+
+{-| Add and extra input "channel" to be ignored and just sent on as output.
+Useful as a building block for more complex automata
+-}
+extendDown : Automaton i o -> Automaton (i, extra) (o, extra)
+extendDown auto = 
+  Step <| \(i, ex) -> let (f', o) = step i auto
+                       in (extendDown f', (o, ex))
+
 {-| Feed an automaton's output into it's own input. Maintains a state within the
-loop, and updates that state after each run of the loop. 
+loop, and updates that state after each run of the loop. Requires an initial
+state. 
 -}
 loop : state -> Automaton (i,state) (o,state) -> Automaton i o
 loop state auto =
@@ -106,8 +125,8 @@ state s f = Step (\x -> let s' = f x s
 step function to step the state forward and produce an output.
 -}
 hiddenState : s -> (i -> s -> (o,s)) -> Automaton i o
-hiddenState s f = Step (\x -> let (out, s') = f x s
-                              in  (hiddenState s' f, out))
+hiddenState s f = Step (\x -> let (s',out) = f x s
+                              in  (hiddenState out f, s'))
 
 {-| Count the number of steps taken. -}
 count : Automaton a Int
@@ -120,18 +139,17 @@ dequeue q = case q of
               ([],[]) -> Nothing
               (en,[]) -> dequeue ([], reverse en)
               (en,hd::tl) -> Just (hd, (en,tl))
-
 {-| Computes the running average of the last `n` inputs. -}
 average : Int -> Automaton Float Float
 average k =
   let step n (ns,len,sum) =
           if len == k then stepFull n (ns,len,sum)
-                      else ((enqueue n ns, len+1, sum+n), (sum+n) / (toFloat len+1))
+                      else ((sum+n) / (toFloat len+1), (enqueue n ns, len+1, sum+n))
       stepFull n (ns,len,sum) =
           case dequeue ns of
-            Nothing -> ((ns,len,sum), 0)
+            Nothing -> (0, (ns,len,sum))
             Just (m,ns') -> let sum' = sum + n - m
-                            in ((enqueue n ns', len, sum'), sum' / toFloat len)
+                            in ((sum' / toFloat len), (enqueue n ns', len, sum'))
   in  hiddenState (empty,0,0) step
 
 
