@@ -1,4 +1,4 @@
-{ "version": "0.1.0.3"
+{ "version": "1.0.0"
 , "summary": "experimental library for structuring code, based on Arrowized FRP"
 , "description": "This is an experimental library for structuring code. It is based on Arrowized FRP, which aimed to provide an API for higher-order signal graphs. There are many ways to structure code though, and it is not yet clear when AFRP is a superior method. So this library is meant to explore the basics of AFRP and find cases where it is a really good fit."
 , "license": "BSD3"

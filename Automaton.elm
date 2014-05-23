@@ -1,5 +1,7 @@
 module Automaton ( pure, state, hiddenState, run, step
-                 , andThen, combine, loop, count, average
+                 , (>>>), combine, loop, count, average
+                 , branch, pair, first, second
+                 , (<<<), merge
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -19,10 +21,10 @@ a larger program with it or have ideas of how to extend the API.
 @docs pure, state, hiddenState
 
 # Evaluate
-@docs run, step
+@docs run, step, merge
 
 # Combine
-@docs andThen, combine, loop
+@docs (>>>), (<<<), second, first, branch, pair, combine, loop
 
 # Common Automatons
 @docs count, average
@@ -54,15 +56,69 @@ look something like this:
 move   : Automaton Spaceship Spaceship
 rotate : Automaton Spaceship Spaceship
 
-step = move `andThen` rotate
+step = move >>> rotate
 ```
 -}
-andThen : Automaton i inner -> Automaton inner o -> Automaton i o
-andThen f g =
-  Step (\a -> let (f', b) = step a f
-                  (g', c) = step b g
-              in  (andThen f' g', c))
+(>>>) : Automaton i inner -> Automaton inner o -> Automaton i o
+(>>>) f g =
+  Step <| \a -> let (f', b) = step a f
+                    (g', c) = step b g
+                 in ((>>>) f' g', c)
 
+{-| Chains two automata together, backwards. 
+-}
+(<<<) : Automaton inner o -> Automaton i inner -> Automaton i o
+(<<<) g f =
+  Step <| \a -> let (f', b) = step a f
+                    (g', c) = step b g
+                 in ((<<<) g' f', c)
+
+{-| Combine two automatons that work on the same kind of input. the output
+becomes a tuple of the outputs. 
+-}
+branch : Automaton i o1 -> Automaton i o2 -> Automaton i (o1, o2)
+branch f g =
+  Step <| \a -> let (f', b) = step a f
+                    (g', c) = step a g
+                 in (branch f' g', (b, c))
+
+{-| Stacks two Automata on top of eachother, tupling inputs and outputs
+-}
+pair : Automaton i1 o1 -> Automaton i2 o2 -> Automaton (i1, i2) (o1, o2)
+pair f g = 
+  Step <| \(a, b) -> let (f', c) = step a f
+                         (g', d) = step b g
+                      in (pair f' g', (c, d))
+
+{-| Add an extra input "channel" to be ignored and just sent on as output.
+Useful as a building block for more complex automata.
+-}
+first : Automaton i o -> Automaton (i, extra) (o, extra)
+first auto = 
+  Step <| \(i, ex) -> let (f, o) = step i auto
+                       in (first f, (o, ex))
+
+{-| Adds an extra input "channel" to be ignored and sent on as output. Similar
+to first, but adds the input before the regular one. 
+-}
+second : Automaton i o -> Automaton (extra, i) (extra, o)
+second auto = 
+  Step <| \(ex, i) -> let (f, o) = step i auto
+                       in (second f, (ex, o))
+
+{-| Automaton reduction. Takes an automaton that outputs a tuple, and performs
+a user defined evaluation function. 
+-}
+merge : Automaton i (o1, o2) -> (o1 -> o2 -> o) -> Automaton i o
+merge auto f =
+  Step <| \a -> let (auto', (o1, o2)) = step a auto
+                    o = f o1 o2
+                 in (merge auto' f, o)
+
+{-| Feed an automaton's output into it's own input. Maintains a state within the
+loop, and updates that state after each run of the loop. Requires an initial
+state. 
+-}
 loop : state -> Automaton (i,state) (o,state) -> Automaton i o
 loop state auto =
     Step <| \input -> let (auto', (output,state')) = step (input,state) auto
@@ -102,9 +158,9 @@ state s f = Step (\x -> let s' = f x s
 {-| Create an automaton with hidden state. Requires an initial state and a
 step function to step the state forward and produce an output.
 -}
-hiddenState : s -> (i -> s -> (s,o)) -> Automaton i o
+hiddenState : s -> (i -> s -> (o,s)) -> Automaton i o
 hiddenState s f = Step (\x -> let (s',out) = f x s
-                              in  (hiddenState s' f, out))
+                              in  (hiddenState out f, s'))
 
 {-| Count the number of steps taken. -}
 count : Automaton a Int
@@ -117,18 +173,17 @@ dequeue q = case q of
               ([],[]) -> Nothing
               (en,[]) -> dequeue ([], reverse en)
               (en,hd::tl) -> Just (hd, (en,tl))
-
 {-| Computes the running average of the last `n` inputs. -}
 average : Int -> Automaton Float Float
 average k =
   let step n (ns,len,sum) =
           if len == k then stepFull n (ns,len,sum)
-                      else ((enqueue n ns, len+1, sum+n), (sum+n) / (toFloat len+1))
+                      else ((sum+n) / (toFloat len+1), (enqueue n ns, len+1, sum+n))
       stepFull n (ns,len,sum) =
           case dequeue ns of
-            Nothing -> ((ns,len,sum), 0)
+            Nothing -> (0, (ns,len,sum))
             Just (m,ns') -> let sum' = sum + n - m
-                            in ((enqueue n ns', len, sum'), sum' / toFloat len)
+                            in ((sum' / toFloat len), (enqueue n ns', len, sum'))
   in  hiddenState (empty,0,0) step
 
 
