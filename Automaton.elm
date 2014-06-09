@@ -31,9 +31,9 @@ a larger program with it or have ideas of how to extend the API.
 -}
 
 import Basics (..)
-import Signal (lift,foldp,Signal)
+import Signal ( lift, foldp, Signal )
 import List (..)
-import Maybe (Just, Nothing)
+import Maybe ( Maybe(Just, Nothing) )
 
 data Automaton a b = Step (a -> (Automaton a b, b))
 
