@@ -1,7 +1,10 @@
-module Automaton ( pure, state, hiddenState, run, step
-                 , (>>>), combine, loop, count, average
-                 , branch, pair, first, second
-                 , (<<<), merge
+module Automaton ( pure, state, hiddenState
+                 , run, step
+                 , (>>>), (<<<)
+                 , branch, pair, merge
+                 , first, second
+                 , combine, loop
+                 , count, average
                  ) where
 
 {-| This library is for structuring reactive code. The key concepts come
@@ -21,10 +24,10 @@ a larger program with it or have ideas of how to extend the API.
 @docs pure, state, hiddenState
 
 # Evaluate
-@docs run, step, merge
+@docs run, step
 
 # Combine
-@docs (>>>), (<<<), second, first, branch, pair, combine, loop
+@docs (>>>), (<<<), branch, pair, merge, first, second, combine, loop
 
 # Common Automatons
 @docs count, average
@@ -49,15 +52,14 @@ run auto base inputs =
 step : i -> Automaton i o -> (Automaton i o, o)
 step a (Step f) = f a
 
-{-| Compose two automatons, chaining them together. That will typically
-look something like this:
+{-| Compose two automatons into a pipeline. For example, lets say we have a way
+to build a ship out of wood and a way to crash a ship and create a wreck.
 
-```haskell
-move   : Automaton Spaceship Spaceship
-rotate : Automaton Spaceship Spaceship
+      gatherWood : Automaton Trees Wood
+      buildShip  : Automaton Wood  Ship
 
-step = move >>> rotate
-```
+      createShip : Automaton Trees Ship
+      createShip = gatherWood >>> buildShip
 -}
 (>>>) : Automaton i inner -> Automaton inner o -> Automaton i o
 (>>>) f g =
@@ -65,7 +67,16 @@ step = move >>> rotate
                     (g', c) = step b g
                  in ((>>>) f' g', c)
 
-{-| Chains two automata together, backwards. 
+{-| Compose two automatons into a pipeline. For example, lets say we have a way
+to build a ship out of wood and a way to crash a ship and create a wreck.
+
+      gatherWood : Automaton Trees Wood
+      buildShip  : Automaton Wood  Ship
+
+      createShip : Automaton Trees Ship
+      createShip = buildShip <<< gatherWood
+
+It's probably better to favor `(>>>)` though. It seems clearer.
 -}
 (<<<) : Automaton inner o -> Automaton i inner -> Automaton i o
 (<<<) g f =
@@ -73,8 +84,13 @@ step = move >>> rotate
                     (g', c) = step b g
                  in ((<<<) g' f', c)
 
-{-| Combine two automatons that work on the same kind of input. the output
-becomes a tuple of the outputs. 
+{-| Take a single input and branch it out into two different results.
+
+      buildShip  : Automaton Wood Ship
+      buildHouse : Automaton Wood House
+
+      build : Automaton Wood (Ship,House)
+      build = branch buildShip buildHouse
 -}
 branch : Automaton i o1 -> Automaton i o2 -> Automaton i (o1, o2)
 branch f g =
@@ -82,7 +98,15 @@ branch f g =
                     (g', c) = step a g
                  in (branch f' g', (b, c))
 
-{-| Stacks two Automata on top of eachother, tupling inputs and outputs
+{-| Combine two independent automatons. The new automaton takes a pair of
+inputs and produces a pair of outputs. In this case we convert two separate
+values into two separate piles of wood:
+
+      tsunami : Automaton Ship  Wood
+      tornado : Automaton House Wood
+
+      disaster : Automaton (Ship,House) (Wood,Wood)
+      disaster = pair tsunami tornado
 -}
 pair : Automaton i1 o1 -> Automaton i2 o2 -> Automaton (i1, i2) (o1, o2)
 pair f g = 
@@ -90,34 +114,71 @@ pair f g =
                          (g', d) = step b g
                       in (pair f' g', (c, d))
 
-{-| Add an extra input "channel" to be ignored and just sent on as output.
-Useful as a building block for more complex automata.
+{-| Create an automaton that takes in a tuple and returns a tuple, but only
+transform the *first* thing in the tuple.
+
+      build       : Automaton Wood (Ship,House)
+      upgradeShip : Automaton Ship Yacht
+
+      buildNicer : Automaton Wood (Yacht,House)
+      buildNicer = build >>> first upgradeShip
+
+It may be helpful to know about the following equivalence:
+
+      first upgradeShip == pair upgradeShip (pure id)
 -}
 first : Automaton i o -> Automaton (i, extra) (o, extra)
 first auto = 
   Step <| \(i, ex) -> let (f, o) = step i auto
                        in (first f, (o, ex))
 
-{-| Adds an extra input "channel" to be ignored and sent on as output. Similar
-to first, but adds the input before the regular one. 
+{-| Create an automaton that takes in a tuple and returns a tuple, but only
+transform the *first* thing in the tuple.
+
+      build        : Automaton Wood (Ship,House)
+      upgradeHouse : Automaton House Palace
+
+      buildNicer : Automaton Wood (Ship,Palace)
+      buildNicer = build >>> second upgradeHouse
+
+It may be helpful to know about the following equivalence:
+
+      second upgradeHouse == pair (pure id) upgradeHouse
 -}
 second : Automaton i o -> Automaton (extra, i) (extra, o)
 second auto = 
   Step <| \(ex, i) -> let (f, o) = step i auto
                        in (second f, (ex, o))
 
-{-| Automaton reduction. Takes an automaton that outputs a tuple, and performs
-a user defined evaluation function. 
--}
-merge : Automaton i (o1, o2) -> (o1 -> o2 -> o) -> Automaton i o
-merge auto f =
-  Step <| \a -> let (auto', (o1, o2)) = step a auto
-                    o = f o1 o2
-                 in (merge auto' f, o)
+{-| Create an automaton that takes a branched input and merges it into a single
+output.
 
-{-| Feed an automaton's output into it's own input. Maintains a state within the
-loop, and updates that state after each run of the loop. Requires an initial
-state. 
+      disaster : Automaton (Ship,House) (Wood,Wood)
+      pileWood : Wood -> Wood -> Wood
+
+      disasterRelief : Automaton (Ship,House) Wood
+      disasterRelief = disaster >>> merge pileWood
+
+It may be helpful to notice that merge is just a variation of `pure`:
+
+      merge plieWood == pure (\(logs,sticks) -> pileWood logs sticks)
+-}
+merge : (i1 -> i2 -> o) -> Automaton (i1,i2) o
+merge f = pure (uncurry f)
+
+{-| Turn an automaton into a loop, feeding some of its output back into itself!
+This is how you make a stateful automaton the hard way.
+
+      data Feelings = Happy | Sad
+
+      stepPerson : (Action, Feelings) -> (Reaction, Feelings)
+
+      person : Automaton Action Reaction
+      person = loop Happy (pure stepPerson)
+
+This example is equivalent to using `hiddenState` to create a `person`, but the
+benefit of loop is that you can introduce state into *existing* automatons
+rather than creating them from scratch.
 -}
 loop : state -> Automaton (i,state) (o,state) -> Automaton i o
 loop state auto =
@@ -134,6 +195,14 @@ combine autos =
 
 {-| Create an automaton with no memory. It just applies the given function to
 every input.
+
+      burnCoal : Coal -> Energy
+
+      powerPlant : Automaton Coal Energy
+      powerPlant = pure burnCoal
+
+The term *pure* refers to the fact that [the same input will always result in
+the same output](http://en.wikipedia.org/wiki/Pure_function).
 -}
 pure : (a -> b) -> Automaton a b
 pure f = Step (\x -> (pure f, f x))
@@ -143,24 +212,35 @@ pure f = Step (\x -> (pure f, f x))
 function to step the state forward. For example, an automaton that counted
 how many steps it has taken would look like this:
 
-```haskell
-count = Automaton a Int
-count = state 0 (\\_ c -> c+1)
-```
+      count = Automaton a Int
+      count = state 0 (\_ c -> c+1)
 
 It is a stateful automaton. The initial state is zero, and the step function
 increments the state on every step.
 -}
 state : b -> (a -> b -> b) -> Automaton a b
-state s f = Step (\x -> let s' = f x s
-                        in  (state s' f, s'))
+state s f =
+    Step <| \x -> let s' = f x s
+                  in  (state s' f, s')
 
 {-| Create an automaton with hidden state. Requires an initial state and a
 step function to step the state forward and produce an output.
+
+      data Feelings = Happy | Sad
+
+      stepPerson : Action -> Feelings -> (Reaction, Feelings)
+
+      person : Automaton Action Reaction
+      person = hiddenState Happy stepPerson
+
+Notice that a `person` has feelings, but like [the
+Behaviorists](http://en.wikipedia.org/wiki/Behaviorism), we do not need to
+worry about that as an outside observer.
 -}
 hiddenState : s -> (i -> s -> (o,s)) -> Automaton i o
-hiddenState s f = Step (\x -> let (s',out) = f x s
-                              in  (hiddenState out f, s'))
+hiddenState s f =
+    Step <| \x -> let (s',out) = f x s
+                  in  (hiddenState out f, s')
 
 {-| Count the number of steps taken. -}
 count : Automaton a Int
