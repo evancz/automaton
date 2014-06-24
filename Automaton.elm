@@ -42,13 +42,23 @@ data Automaton a b = Step (a -> (Automaton a b, b))
 
 {-| Run an automaton on a given signal. The automaton steps forward whenever the
 input signal updates.
+
+      count : Automaton a Int
+
+      run count Mouse.clicks
 -}
 run : Automaton i o -> o -> Signal i -> Signal o
 run auto base inputs =
   let step a (Step f, _) = f a
   in  lift (\(x,y) -> y) (foldp step (auto,base) inputs)
 
-{-| Step an automaton forward once with a given input. -}
+{-| Step an automaton forward once with a given input.
+
+Say we start with the `count` automaton, which begins with the counter at zero.
+When we run `step 42 count` we get back a new automaton with the counter at
+1 and the value 1. The original `count` automaton is unchanged, so we need to
+use the new automaton to use the latest state.
+-}
 step : i -> Automaton i o -> (Automaton i o, o)
 step a (Step f) = f a
 
@@ -75,8 +85,6 @@ to build a ship out of wood and a way to crash a ship and create a wreck.
 
       createShip : Automaton Trees Ship
       createShip = buildShip <<< gatherWood
-
-It's probably better to favor `(>>>)` though. It seems clearer.
 -}
 (<<<) : Automaton inner o -> Automaton i inner -> Automaton i o
 (<<<) g f =
@@ -177,8 +185,9 @@ This is how you make a stateful automaton the hard way.
       person = loop Happy (pure stepPerson)
 
 This example is equivalent to using `hiddenState` to create a `person`, but the
-benefit of loop is that you can introduce state into *existing* automatons
-rather than creating them from scratch.
+benefit of loop is that you can add state to *any* automaton. We used
+`(pure stepPerson)` in our example, but something more complex such as
+`(branch f g >>> merge h)` would work just as well with `loop`.
 -}
 loop : state -> Automaton (i,state) (o,state) -> Automaton i o
 loop state auto =
@@ -253,6 +262,7 @@ dequeue q = case q of
               ([],[]) -> Nothing
               (en,[]) -> dequeue ([], reverse en)
               (en,hd::tl) -> Just (hd, (en,tl))
+
 {-| Computes the running average of the last `n` inputs. -}
 average : Int -> Automaton Float Float
 average k =
