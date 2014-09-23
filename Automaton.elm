@@ -1,5 +1,5 @@
 module Automaton
-    ( pure, state, hiddenState
+    ( Automaton, pure, state, hiddenState
     , run, step
     , (>>>), (<<<)
     , branch, pair, merge
@@ -37,7 +37,6 @@ a larger program with it or have ideas of how to extend the API.
 import Basics (..)
 import Signal ( lift, foldp, Signal )
 import List (..)
-import Maybe ( Maybe(Just, Nothing) )
 
 data Automaton a b =
     Step (a -> (Automaton a b, b))
