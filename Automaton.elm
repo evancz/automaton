@@ -65,7 +65,7 @@ step : i -> Automaton i o -> (Automaton i o, o)
 step a (Step f) = f a
 
 {-| Compose two automatons into a pipeline. For example, lets say we have a way
-to build a ship out of wood and a way to crash a ship and create a wreck.
+to gather wood from the trees and a way to build a ship out of wood.
 
       gatherWood : Automaton Trees Wood
       buildShip  : Automaton Wood  Ship
@@ -82,7 +82,7 @@ to build a ship out of wood and a way to crash a ship and create a wreck.
         (f' >>> g', c)
 
 {-| Compose two automatons into a pipeline. For example, lets say we have a way
-to build a ship out of wood and a way to crash a ship and create a wreck.
+to gather wood from the trees and a way to build a ship out of wood.
 
       gatherWood : Automaton Trees Wood
       buildShip  : Automaton Wood  Ship
@@ -153,7 +153,7 @@ first auto =
         (first f, (o, ex))
 
 {-| Create an automaton that takes in a tuple and returns a tuple, but only
-transform the *first* thing in the tuple.
+transform the *second* thing in the tuple.
 
       build        : Automaton Wood (Ship,House)
       upgradeHouse : Automaton House Palace
