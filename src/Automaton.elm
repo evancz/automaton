@@ -35,11 +35,13 @@ a larger program with it or have ideas of how to extend the API.
 -}
 
 import Basics (..)
-import Signal ( lift, foldp, Signal )
-import List (..)
+import Signal
+import List
+import List ((::))
 
-data Automaton a b =
+type Automaton a b =
     Step (a -> (Automaton a b, b))
+
 
 {-| Run an automaton on a given signal. The automaton steps forward whenever the
 input signal updates.
@@ -52,7 +54,8 @@ run : Automaton i o -> o -> Signal i -> Signal o
 run auto base inputs =
   let step a (Step f, _) = f a
   in
-      lift (\(x,y) -> y) (foldp step (auto,base) inputs)
+      Signal.map (\(x,y) -> y) (Signal.foldp step (auto,base) inputs)
+
 
 {-| Step an automaton forward once with a given input.
 
@@ -63,6 +66,7 @@ use the new automaton to use the latest state.
 -}
 step : i -> Automaton i o -> (Automaton i o, o)
 step a (Step f) = f a
+
 
 {-| Compose two automatons into a pipeline. For example, lets say we have a way
 to gather wood from the trees and a way to build a ship out of wood.
@@ -81,6 +85,7 @@ to gather wood from the trees and a way to build a ship out of wood.
     in
         (f' >>> g', c)
 
+
 {-| Compose two automatons into a pipeline. For example, lets say we have a way
 to gather wood from the trees and a way to build a ship out of wood.
 
@@ -98,6 +103,7 @@ to gather wood from the trees and a way to build a ship out of wood.
     in
         (g' <<< f', c)
 
+
 {-| Take a single input and branch it out into two different results.
 
       buildShip  : Automaton Wood Ship
@@ -113,6 +119,7 @@ branch f g =
         (g', c) = step a g
     in
         (branch f' g', (b, c))
+
 
 {-| Combine two independent automatons. The new automaton takes a pair of
 inputs and produces a pair of outputs. In this case we convert two separate
@@ -131,6 +138,7 @@ pair f g =
         (g', d) = step b g
     in
         (pair f' g', (c, d))
+
 
 {-| Create an automaton that takes in a tuple and returns a tuple, but only
 transform the *first* thing in the tuple.
@@ -152,6 +160,7 @@ first auto =
     in
         (first f, (o, ex))
 
+
 {-| Create an automaton that takes in a tuple and returns a tuple, but only
 transform the *second* thing in the tuple.
 
@@ -172,6 +181,7 @@ second auto =
     in
         (second f, (ex, o))
 
+
 {-| Create an automaton that takes a branched input and merges it into a single
 output.
 
@@ -186,12 +196,14 @@ It may be helpful to notice that merge is just a variation of `pure`:
       merge plieWood == pure (\(logs,sticks) -> pileWood logs sticks)
 -}
 merge : (i1 -> i2 -> o) -> Automaton (i1,i2) o
-merge f = pure (uncurry f)
+merge f =
+  pure (uncurry f)
+
 
 {-| Turn an automaton into a loop, feeding some of its output back into itself!
 This is how you make a stateful automaton the hard way.
 
-      data Feelings = Happy | Sad
+      type Feelings = Happy | Sad
 
       stepPerson : (Action, Feelings) -> (Reaction, Feelings)
 
@@ -210,15 +222,17 @@ loop state auto =
     in 
         (loop state' auto', output)
 
+
 {-| Combine a list of automatons into a single automaton that produces a
 list.
 -}
-combine : [Automaton i o] -> Automaton i [o]
+combine : List (Automaton i o) -> Automaton i (List o)
 combine autos =
   Step <| \a ->
-    let (autos', bs) = unzip (map (step a) autos)
+    let (autos', bs) = List.unzip (List.map (step a) autos)
     in
         (combine autos', bs)
+
 
 {-| Create an automaton with no memory. It just applies the given function to
 every input.
@@ -232,7 +246,8 @@ The term *pure* refers to the fact that [the same input will always result in
 the same output](http://en.wikipedia.org/wiki/Pure_function).
 -}
 pure : (a -> b) -> Automaton a b
-pure f = Step (\x -> (pure f, f x))
+pure f =
+  Step (\x -> (pure f, f x))
 
 
 {-| Create an automaton with state. Requires an initial state and a step
@@ -252,10 +267,11 @@ state s f =
     in
         (state s' f, s')
 
+
 {-| Create an automaton with hidden state. Requires an initial state and a
 step function to step the state forward and produce an output.
 
-      data Feelings = Happy | Sad
+      type Feelings = Happy | Sad
 
       stepPerson : Action -> Feelings -> (Reaction, Feelings)
 
@@ -273,11 +289,14 @@ hiddenState s f =
     in
         (hiddenState out f, s')
 
+
 {-| Count the number of steps taken. -}
 count : Automaton a Int
-count = state 0 (\_ c -> c + 1)
+count =
+  state 0 (\_ c -> c + 1)
 
-type Queue t = ([t],[t])
+
+type alias Queue t = (List t, List t)
 
 empty = ([],[])
 
@@ -286,8 +305,9 @@ enqueue x (en,de) = (x::en, de)
 dequeue q =
   case q of
     ([],[]) -> Nothing
-    (en,[]) -> dequeue ([], reverse en)
+    (en,[]) -> dequeue ([], List.reverse en)
     (en,hd::tl) -> Just (hd, (en,tl))
+
 
 {-| Computes the running average of the last `n` inputs. -}
 average : Int -> Automaton Float Float
@@ -302,7 +322,10 @@ average k =
             Nothing -> (0, (ns,len,sum))
             Just (m,ns') ->
               let sum' = sum + n - m
-              in  ((sum' / toFloat len), (enqueue n ns', len, sum'))
+              in
+                  ( sum' / toFloat len
+                  , (enqueue n ns', len, sum')
+                  )
   in
       hiddenState (empty,0,0) step
 

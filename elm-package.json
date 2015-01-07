@@ -1,0 +1,14 @@
+{ "version": "1.0.0",
+  "summary": "experimental library for structuring code, based on Arrowized FRP",
+  "license": "BSD3",
+  "repository": "https://github.com/evancz/automaton.git",
+  "source-directories": [
+    "src"
+  ],
+  "exposed-modules": [
+    "Automaton"
+  ],
+  "dependencies": {
+    "elm-lang/core": "1.0.0 <= v < 2.0.0"
+  }
+}
