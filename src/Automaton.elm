@@ -259,6 +259,11 @@ how many steps it has taken would look like this:
 
 It is a stateful automaton. The initial state is zero, and the step function
 increments the state on every step.
+
+This is very similar to `Signal.foldp`. Indeed, the following equivalence
+holds:
+
+      foldp f s == run (state s f) s
 -}
 state : b -> (a -> b -> b) -> Automaton a b
 state s f =
