@@ -34,10 +34,6 @@ a larger program with it or have ideas of how to extend the API.
 @docs count, average
 -}
 
-import Basics exposing (..)
-import Signal
-import List
-import List exposing ((::))
 
 type Automaton a b =
     Step (a -> (Automaton a b, b))
@@ -132,7 +128,7 @@ values into two separate piles of wood:
       disaster = pair tsunami tornado
 -}
 pair : Automaton i1 o1 -> Automaton i2 o2 -> Automaton (i1, i2) (o1, o2)
-pair f g = 
+pair f g =
   Step <| \(a, b) ->
     let (f', c) = step a f
         (g', d) = step b g
@@ -154,7 +150,7 @@ It may be helpful to know about the following equivalence:
       first upgradeShip == pair upgradeShip (pure identity)
 -}
 first : Automaton i o -> Automaton (i, extra) (o, extra)
-first auto = 
+first auto =
   Step <| \(i, ex) ->
     let (f, o) = step i auto
     in
@@ -175,7 +171,7 @@ It may be helpful to know about the following equivalence:
       second upgradeHouse == pair (pure identity) upgradeHouse
 -}
 second : Automaton i o -> Automaton (extra, i) (extra, o)
-second auto = 
+second auto =
   Step <| \(ex, i) ->
     let (f, o) = step i auto
     in
@@ -219,7 +215,7 @@ loop : state -> Automaton (i,state) (o,state) -> Automaton i o
 loop state auto =
   Step <| \input ->
     let (auto', (output,state')) = step (input,state) auto
-    in 
+    in
         (loop state' auto', output)
 
 
