@@ -34,10 +34,10 @@ a larger program with it or have ideas of how to extend the API.
 @docs count, average
 -}
 
-import Basics (..)
+import Basics exposing (..)
 import Signal
 import List
-import List ((::))
+import List exposing ((::))
 
 type Automaton a b =
     Step (a -> (Automaton a b, b))
@@ -151,7 +151,7 @@ transform the *first* thing in the tuple.
 
 It may be helpful to know about the following equivalence:
 
-      first upgradeShip == pair upgradeShip (pure id)
+      first upgradeShip == pair upgradeShip (pure identity)
 -}
 first : Automaton i o -> Automaton (i, extra) (o, extra)
 first auto = 
@@ -172,7 +172,7 @@ transform the *second* thing in the tuple.
 
 It may be helpful to know about the following equivalence:
 
-      second upgradeHouse == pair (pure id) upgradeHouse
+      second upgradeHouse == pair (pure identity) upgradeHouse
 -}
 second : Automaton i o -> Automaton (extra, i) (extra, o)
 second auto = 
