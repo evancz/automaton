@@ -21,6 +21,7 @@ a larger program with it or have ideas of how to extend the API.
 
  [afrp]: http://haskell.cs.yale.edu/wp-content/uploads/2011/02/workshop-02.pdf
 
+# Automatons
 @docs Automaton
 
 # Create
@@ -37,7 +38,9 @@ a larger program with it or have ideas of how to extend the API.
 -}
 
 
-{-|
+{-| Think of an automaton as a little robot. It takes in `a` values and spits
+out `b` values. These robots can also remember stuff. If you put two of these
+robots next to each other you can do fancier stuff.
 -}
 type Automaton a b =
     Step (a -> (Automaton a b, b))
