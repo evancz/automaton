@@ -21,6 +21,8 @@ a larger program with it or have ideas of how to extend the API.
 
  [afrp]: http://haskell.cs.yale.edu/wp-content/uploads/2011/02/workshop-02.pdf
 
+@docs Automaton
+
 # Create
 @docs pure, state, hiddenState
 
@@ -35,6 +37,8 @@ a larger program with it or have ideas of how to extend the API.
 -}
 
 
+{-|
+-}
 type Automaton a b =
     Step (a -> (Automaton a b, b))
 
