@@ -51,7 +51,7 @@ input signal updates.
 
       count : Automaton a Int
 
-      run count Mouse.clicks
+      run count 0 Mouse.clicks
 -}
 run : Automaton i o -> o -> Signal i -> Signal o
 run auto base inputs =
