@@ -1,12 +1,22 @@
 module Automaton
-    ( Automaton, pure, state, hiddenState
-    , run, step
-    , (>>>), (<<<)
-    , branch, pair, merge
-    , first, second
-    , combine, loop
-    , count, average
-    ) where
+    exposing
+        ( Automaton
+        , pure
+        , state
+        , hiddenState
+        , step
+        , (>>>)
+        , (<<<)
+        , branch
+        , pair
+        , merge
+        , first
+        , second
+        , combine
+        , loop
+        , count
+        , average
+        )
 
 {-| This library is for structuring reactive code. The key concepts come
 directly from [Arrowized FRP][afrp]. It is not yet clear how
@@ -28,7 +38,7 @@ a larger program with it or have ideas of how to extend the API.
 @docs pure, state, hiddenState
 
 # Evaluate
-@docs run, step
+@docs step
 
 # Combine
 @docs (>>>), (<<<), branch, pair, merge, first, second, combine, loop
@@ -42,22 +52,8 @@ a larger program with it or have ideas of how to extend the API.
 out `b` values. These robots can also remember stuff. If you put two of these
 robots next to each other you can do fancier stuff.
 -}
-type Automaton a b =
-    Step (a -> (Automaton a b, b))
-
-
-{-| Run an automaton on a given signal. The automaton steps forward whenever the
-input signal updates.
-
-      count : Automaton a Int
-
-      run count 0 Mouse.clicks
--}
-run : Automaton i o -> o -> Signal i -> Signal o
-run auto base inputs =
-  let step a (Step f, _) = f a
-  in
-      Signal.map (\(x,y) -> y) (Signal.foldp step (auto,base) inputs)
+type Automaton a b
+    = Step (a -> ( Automaton a b, b ))
 
 
 {-| Step an automaton forward once with a given input.
@@ -67,8 +63,9 @@ When we run `step 42 count` we get back a new automaton with the counter at
 1 and the value 1. The original `count` automaton is unchanged, so we need to
 use the new automaton to use the latest state.
 -}
-step : i -> Automaton i o -> (Automaton i o, o)
-step a (Step f) = f a
+step : i -> Automaton i o -> ( Automaton i o, o )
+step a (Step f) =
+    f a
 
 
 {-| Compose two automatons into a pipeline. For example, lets say we have a way
@@ -82,11 +79,16 @@ to gather wood from the trees and a way to build a ship out of wood.
 -}
 (>>>) : Automaton i inner -> Automaton inner o -> Automaton i o
 (>>>) f g =
-  Step <| \a ->
-    let (f', b) = step a f
-        (g', c) = step b g
-    in
-        (f' >>> g', c)
+    Step <|
+        \a ->
+            let
+                ( f_, b ) =
+                    step a f
+
+                ( g_, c ) =
+                    step b g
+            in
+                ( f_ >>> g_, c )
 
 
 {-| Compose two automatons into a pipeline. For example, lets say we have a way
@@ -100,11 +102,16 @@ to gather wood from the trees and a way to build a ship out of wood.
 -}
 (<<<) : Automaton inner o -> Automaton i inner -> Automaton i o
 (<<<) g f =
-  Step <| \a ->
-    let (f', b) = step a f
-        (g', c) = step b g
-    in
-        (g' <<< f', c)
+    Step <|
+        \a ->
+            let
+                ( f_, b ) =
+                    step a f
+
+                ( g_, c ) =
+                    step b g
+            in
+                ( g_ <<< f_, c )
 
 
 {-| Take a single input and branch it out into two different results.
@@ -115,13 +122,18 @@ to gather wood from the trees and a way to build a ship out of wood.
       build : Automaton Wood (Ship,House)
       build = branch buildShip buildHouse
 -}
-branch : Automaton i o1 -> Automaton i o2 -> Automaton i (o1, o2)
+branch : Automaton i o1 -> Automaton i o2 -> Automaton i ( o1, o2 )
 branch f g =
-  Step <| \a ->
-    let (f', b) = step a f
-        (g', c) = step a g
-    in
-        (branch f' g', (b, c))
+    Step <|
+        \a ->
+            let
+                ( f_, b ) =
+                    step a f
+
+                ( g_, c ) =
+                    step a g
+            in
+                ( branch f_ g_, ( b, c ) )
 
 
 {-| Combine two independent automatons. The new automaton takes a pair of
@@ -134,13 +146,18 @@ values into two separate piles of wood:
       disaster : Automaton (Ship,House) (Wood,Wood)
       disaster = pair tsunami tornado
 -}
-pair : Automaton i1 o1 -> Automaton i2 o2 -> Automaton (i1, i2) (o1, o2)
+pair : Automaton i1 o1 -> Automaton i2 o2 -> Automaton ( i1, i2 ) ( o1, o2 )
 pair f g =
-  Step <| \(a, b) ->
-    let (f', c) = step a f
-        (g', d) = step b g
-    in
-        (pair f' g', (c, d))
+    Step <|
+        \( a, b ) ->
+            let
+                ( f_, c ) =
+                    step a f
+
+                ( g_, d ) =
+                    step b g
+            in
+                ( pair f_ g_, ( c, d ) )
 
 
 {-| Create an automaton that takes in a tuple and returns a tuple, but only
@@ -156,12 +173,15 @@ It may be helpful to know about the following equivalence:
 
       first upgradeShip == pair upgradeShip (pure identity)
 -}
-first : Automaton i o -> Automaton (i, extra) (o, extra)
+first : Automaton i o -> Automaton ( i, extra ) ( o, extra )
 first auto =
-  Step <| \(i, ex) ->
-    let (f, o) = step i auto
-    in
-        (first f, (o, ex))
+    Step <|
+        \( i, ex ) ->
+            let
+                ( f, o ) =
+                    step i auto
+            in
+                ( first f, ( o, ex ) )
 
 
 {-| Create an automaton that takes in a tuple and returns a tuple, but only
@@ -177,12 +197,15 @@ It may be helpful to know about the following equivalence:
 
       second upgradeHouse == pair (pure identity) upgradeHouse
 -}
-second : Automaton i o -> Automaton (extra, i) (extra, o)
+second : Automaton i o -> Automaton ( extra, i ) ( extra, o )
 second auto =
-  Step <| \(ex, i) ->
-    let (f, o) = step i auto
-    in
-        (second f, (ex, o))
+    Step <|
+        \( ex, i ) ->
+            let
+                ( f, o ) =
+                    step i auto
+            in
+                ( second f, ( ex, o ) )
 
 
 {-| Create an automaton that takes a branched input and merges it into a single
@@ -198,9 +221,9 @@ It may be helpful to notice that merge is just a variation of `pure`:
 
       merge plieWood == pure (\(logs,sticks) -> pileWood logs sticks)
 -}
-merge : (i1 -> i2 -> o) -> Automaton (i1,i2) o
+merge : (i1 -> i2 -> o) -> Automaton ( i1, i2 ) o
 merge f =
-  pure (uncurry f)
+    pure (uncurry f)
 
 
 {-| Turn an automaton into a loop, feeding some of its output back into itself!
@@ -218,12 +241,15 @@ benefit of loop is that you can add state to *any* automaton. We used
 `(pure stepPerson)` in our example, but something more complex such as
 `(branch f g >>> merge h)` would work just as well with `loop`.
 -}
-loop : state -> Automaton (i,state) (o,state) -> Automaton i o
+loop : state -> Automaton ( i, state ) ( o, state ) -> Automaton i o
 loop state auto =
-  Step <| \input ->
-    let (auto', (output,state')) = step (input,state) auto
-    in
-        (loop state' auto', output)
+    Step <|
+        \input ->
+            let
+                ( auto_, ( output, state_ ) ) =
+                    step ( input, state ) auto
+            in
+                ( loop state_ auto_, output )
 
 
 {-| Combine a list of automatons into a single automaton that produces a
@@ -231,10 +257,13 @@ list.
 -}
 combine : List (Automaton i o) -> Automaton i (List o)
 combine autos =
-  Step <| \a ->
-    let (autos', bs) = List.unzip (List.map (step a) autos)
-    in
-        (combine autos', bs)
+    Step <|
+        \a ->
+            let
+                ( autos_, bs ) =
+                    List.unzip (List.map (step a) autos)
+            in
+                ( combine autos_, bs )
 
 
 {-| Create an automaton with no memory. It just applies the given function to
@@ -250,7 +279,7 @@ the same output](http://en.wikipedia.org/wiki/Pure_function).
 -}
 pure : (a -> b) -> Automaton a b
 pure f =
-  Step (\x -> (pure f, f x))
+    Step (\x -> ( pure f, f x ))
 
 
 {-| Create an automaton with state. Requires an initial state and a step
@@ -262,18 +291,16 @@ how many steps it has taken would look like this:
 
 It is a stateful automaton. The initial state is zero, and the step function
 increments the state on every step.
-
-This is very similar to `Signal.foldp`. Indeed, the following equivalence
-holds:
-
-      foldp f s == run (state s f) s
 -}
 state : b -> (a -> b -> b) -> Automaton a b
 state s f =
-  Step <| \x ->
-    let s' = f x s
-    in
-        (state s' f, s')
+    Step <|
+        \x ->
+            let
+                s_ =
+                    f x s
+            in
+                ( state s_ f, s_ )
 
 
 {-| Create an automaton with hidden state. Requires an initial state and a
@@ -290,55 +317,78 @@ Notice that a `person` has feelings, but like [the
 Behaviorists](http://en.wikipedia.org/wiki/Behaviorism), we do not need to
 worry about that as an outside observer.
 -}
-hiddenState : s -> (i -> s -> (o,s)) -> Automaton i o
+hiddenState : s -> (i -> s -> ( o, s )) -> Automaton i o
 hiddenState s f =
-  Step <| \x ->
-    let (s',out) = f x s
-    in
-        (hiddenState out f, s')
+    Step <|
+        \x ->
+            let
+                ( s_, out ) =
+                    f x s
+            in
+                ( hiddenState out f, s_ )
 
 
-{-| Count the number of steps taken. -}
+{-| Count the number of steps taken.
+-}
 count : Automaton a Int
 count =
-  state 0 (\_ c -> c + 1)
+    state 0 (\_ c -> c + 1)
 
 
-type alias Queue t = (List t, List t)
+type alias Queue t =
+    ( List t, List t )
 
-empty = ([],[])
 
-enqueue x (en,de) = (x::en, de)
+empty =
+    ( [], [] )
+
+
+enqueue x ( en, de ) =
+    ( x :: en, de )
+
 
 dequeue q =
-  case q of
-    ([],[]) -> Nothing
-    (en,[]) -> dequeue ([], List.reverse en)
-    (en,hd::tl) -> Just (hd, (en,tl))
+    case q of
+        ( [], [] ) ->
+            Nothing
+
+        ( en, [] ) ->
+            dequeue ( [], List.reverse en )
+
+        ( en, hd :: tl ) ->
+            Just ( hd, ( en, tl ) )
 
 
-{-| Computes the running average of the last `n` inputs. -}
+{-| Computes the running average of the last `n` inputs.
+-}
 average : Int -> Automaton Float Float
 average k =
-  let step n (ns, len, sum) =
-          if len == k
-            then stepFull n (ns,len,sum)
-            else ((sum+n) / (toFloat len+1), (enqueue n ns, len+1, sum+n))
+    let
+        step n ( ns, len, sum ) =
+            if len == k then
+                stepFull n ( ns, len, sum )
+            else
+                ( (sum + n) / (toFloat len + 1), ( enqueue n ns, len + 1, sum + n ) )
 
-      stepFull n (ns,len,sum) =
-          case dequeue ns of
-            Nothing -> (0, (ns,len,sum))
-            Just (m,ns') ->
-              let sum' = sum + n - m
-              in
-                  ( sum' / toFloat len
-                  , (enqueue n ns', len, sum')
-                  )
-  in
-      hiddenState (empty,0,0) step
+        stepFull n ( ns, len, sum ) =
+            case dequeue ns of
+                Nothing ->
+                    ( 0, ( ns, len, sum ) )
+
+                Just ( m, ns_ ) ->
+                    let
+                        sum_ =
+                            sum + n - m
+                    in
+                        ( sum_ / toFloat len
+                        , ( enqueue n ns_, len, sum_ )
+                        )
+    in
+        hiddenState ( empty, 0, 0 ) step
 
 
-{-- TODO(evancz): See the following papers for ideas on how to make this
+
+{--TODO(evancz): See the following papers for ideas on how to make this
 library faster and better:
 
 - Functional Reactive Programming, Continued
